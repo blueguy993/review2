@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Investment Insights — Single File</title>
+    <style>
+      /* Minimal reset and layout styling (keeps it self-contained) */
+      :root{--bg:#f8fafc;--card:#fff;--muted:#6b7280;--accent:#2563eb}
+      html,body,#root{height:100%;}
+      body{margin:0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:#111}
+      .container{max-width:1100px;margin:24px auto;padding:16px}
+      nav{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:8px;background:#eef2ff}
+      nav a{margin-right:12px;color:var(--accent);text-decoration:none;font-weight:600}
+      .card{background:var(--card);padding:14px;border-radius:8px;box-shadow:0 1px 3px rgba(2,6,23,0.06)}
+      .grid{display:grid;gap:12px}
+      .grid.cols-3{grid-template-columns:repeat(3,1fr)}
+      .grid.cols-2{grid-template-columns:repeat(2,1fr)}
+      .muted{color:var(--muted)}
+      .btn{background:var(--accent);color:white;padding:8px 12px;border-radius:6px;border:none;cursor:pointer}
+      .btn.secondary{background:#ef4444}
+      .flex{display:flex;align-items:center}
+      .space-x{gap:12px;display:flex}
+      input,select{padding:8px;border:1px solid #e6e7eb;border-radius:6px;width:100%}
+      header h1{margin:0;font-size:20px}
+      .small{font-size:13px}
+      pre{white-space:pre-wrap}
+      /* simple bar chart */
+      .bar-row{display:flex;align-items:center;gap:8px}
+      .bar-label{width:90px}
+      .bar-track{background:#f1f5f9;height:14px;border-radius:8px;flex:1;overflow:hidden}
+      .bar-fill{height:14px;background:linear-gradient(90deg,var(--accent),#10b981)}
+      /* responsive */
+      @media (max-width:800px){.grid.cols-3{grid-template-columns:1fr}.container{margin:12px}}
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <!-- React and Babel for in-browser JSX compilation (fine for demos) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Single-file app: JSX transformed by Babel at runtime -->
+    <script type="text/babel">
+      const { useState, useEffect } = React;
+
+      // Simple hash router
+      function useHashRoute() {
+        const [route, setRoute] = useState(location.hash.replace('#','') || '/');
+        useEffect(()=>{
+          const onHash = ()=> setRoute(location.hash.replace('#','') || '/');
+          window.addEventListener('hashchange', onHash);
+          return ()=> window.removeEventListener('hashchange', onHash);
+        },[]);
+        const push = (r)=> location.hash = r;
+        return { route, push };
+      }
+
+      // Auth (localStorage)
+      const AUTH_KEY = 'mf_app_user_single';
+      function useAuth(){
+        const [user, setUser] = useState(()=>{
+          try{ return JSON.parse(localStorage.getItem(AUTH_KEY)) }catch(e){return null}
+        });
+        useEffect(()=>{ if(user) localStorage.setItem(AUTH_KEY, JSON.stringify(user)); else localStorage.removeItem(AUTH_KEY) },[user]);
+        const login = (username,role)=> setUser({username,role});
+        const logout = ()=> setUser(null);
+        return { user, login, logout };
+      }
+
+      function Nav({user, onLogout, navigate}){
+        return (
+          <nav className="card">
+            <div className="flex">
+              <a href="#/">MutualFundsLite</a>
+              {user && (
+                <div className="space-x">
+                  <a href="#/">Home</a>
+                  <a href="#/funds">Funds</a>
+                  <a href="#/trends">Market Trends</a>
+                  {user.role==='investor' && <a href="#/insights">Insights</a>}
+                </div>
+              )}
+            </div>
+            <div className="flex">
+              {user ? (
+                <>
+                  <div className="small muted">{user.username} ({user.role})</div>
+                  <button className="btn secondary" style={{marginLeft:12}} onClick={onLogout}>Logout</button>
+                </>
+              ):(
+                <a className="btn" href="#/login">Login</a>
+              )}
+            </div>
+          </nav>
+        );
+      }
+
+      function Home(){
+        return (
+          <div className="grid cols-2">
+            <div className="card">
+              <h2>Welcome to MutualFundsLite</h2>
+              <p className="muted">Lightweight demo platform for role-based mutual fund management.</p>
+            </div>
+            <div className="card">
+              <h3>Quick Links</h3>
+              <ul>
+                <li><a href="#/login">Login</a></li>
+                <li><a href="#/funds">Funds Directory</a></li>
+                <li><a href="#/trends">Market Trends</a></li>
+              </ul>
+            </div>
+          </div>
+        )
+      }
+
+      function Login({onLogin}){
+        const [username,setUsername] = useState('');
+        const [role,setRole] = useState('investor');
+        const [err,setErr] = useState(null);
+        const submit = (e)=>{
+          e.preventDefault();
+          if(!username.trim()){ setErr('Enter username'); return }
+          onLogin(username.trim(), role);
+          location.hash = role==='admin'? '#/admin': `#/${role}`;
+        };
+        return (
+          <div className="card" style={{maxWidth:480,margin:'24px auto'}}>
+            <h3>Login</h3>
+            <form onSubmit={submit} style={{display:'grid',gap:10}}>
+              <label>Username<input value={username} onChange={e=>setUsername(e.target.value)} /></label>
+              <label>Role<select value={role} onChange={e=>setRole(e.target.value)}>
+                <option value="investor">Investor</option>
+                <option value="advisor">Advisor</option>
+                <option value="analyst">Analyst</option>
+                <option value="admin">Admin</option>
+              </select></label>
+              {err && <div style={{color:'crimson'}}>{err}</div>}
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <button className="btn">Login</button>
+                <small className="muted">Demo only — no backend</small>
+              </div>
+            </form>
+          </div>
+        )
+      }
+
+      function Card({title,children}){
+        return <div className="card"><h4>{title}</h4><div>{children}</div></div>
+      }
+
+      function SimpleBarChart({data}){
+        const max = Math.max(...data.map(d=>d.value),1);
+        return (
+          <div>
+            {data.map(d=> (
+              <div key={d.label} className="bar-row" style={{margin:'8px 0'}}>
+                <div className="bar-label">{d.label}</div>
+                <div className="bar-track"><div className="bar-fill" style={{width:(d.value/max*100)+'%'}}/></div>
+                <div style={{width:60,textAlign:'right'}}>{d.value}</div>
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      function FundsList({url}){
+        const [data,setData]=useState(null);
+        const [loading,setLoading]=useState(false);
+        const [err,setErr]=useState(null);
+        useEffect(()=>{
+          if(!url) return;
+          setLoading(true);setErr(null);
+          fetch(url).then(r=>r.json()).then(j=>setData(j)).catch(e=>setErr(e.message)).finally(()=>setLoading(false));
+        },[url]);
+        return (
+          <Card title="Funds Directory">
+            {loading && <div>Loading...</div>}
+            {err && <div style={{color:'crimson'}}>{err}</div>}
+            {data && Array.isArray(data) ? (
+              <div style={{maxHeight:220,overflow:'auto'}}>
+                {data.slice(0,8).map((f,i)=> <div key={i} style={{padding:'8px 0',borderBottom:'1px solid #f1f5f9'}}>
+                  <div style={{fontWeight:600}}>{f.schemeName||f.fundName||f.name||('Fund '+(i+1))}</div>
+                  <div className="muted">{f.schemeCode||f.code||''}</div>
+                </div>)}
+              </div>
+            ) : (
+              <pre className="muted">{data ? JSON.stringify(data,null,2) : 'No data (demo) — try an API such as https://api.mfapi.in/mf'}</pre>
+            )}
+          </Card>
+        )
+      }
+
+      function Admin(){
+        return (
+          <div className="grid cols-3">
+            <div className="card"><h3>Total Users</h3><div>1,234</div></div>
+            <div className="card"><h3>Active Investors</h3><div>812</div></div>
+            <div className="card"><h3>Funds Tracked</h3><div>542</div></div>
+            <div className="card" style={{gridColumn:'1/-1'}}>
+              <h3>Recent Activity</h3>
+              <ul className="muted"><li>User alice created account</li><li>Fund BlueChip updated NAV</li></ul>
+            </div>
+          </div>
+        )
+      }
+
+      function Investor(){
+        const chartData = [{label:'Jan',value:10},{label:'Feb',value:14},{label:'Mar',value:9},{label:'Apr',value:18}];
+        return (
+          <div className="grid cols-2">
+            <div className="card">
+              <h3>Portfolio Value</h3>
+              <div style={{fontSize:22,fontWeight:700}}>₹1,23,456</div>
+              <div className="muted">YTD Return: 12.6%</div>
+            </div>
+            <FundsList url="https://api.mfapi.in/mf" />
+            <div className="card" style={{gridColumn:'1/-1'}}>
+              <h3>Portfolio Performance</h3>
+              <SimpleBarChart data={chartData} />
+            </div>
+          </div>
+        )
+      }
+
+      function Advisor(){
+        return (
+          <div className="grid cols-2">
+            <div className="card"><h3>Clients</h3><div>78</div></div>
+            <div className="card"><h3>Advised AUM</h3><div>₹8.2 Cr</div></div>
+            <div className="card" style={{gridColumn:'1/-1'}}>
+              <h3>Top Clients</h3>
+              <ul className="muted"><li>Client A — ₹2.3L</li><li>Client B — ₹4.1L</li></ul>
+            </div>
+          </div>
+        )
+      }
+
+      function Analyst(){
+        const analytics = [{label:'Equity Funds',value:240},{label:'Debt Funds',value:180},{label:'Hybrid Funds',value:120}];
+        return (
+          <div>
+            <div className="grid cols-3">
+              <div className="card"><h3>Datasets</h3><div>12</div></div>
+              <div className="card"><h3>Reports</h3><div>240</div></div>
+              <div className="card"><h3>DB Size</h3><div>3.6 GB</div></div>
+            </div>
+            <div className="card" style={{marginTop:12}}>
+              <h3>Category Distribution</h3>
+              <SimpleBarChart data={analytics} />
+            </div>
+          </div>
+        )
+      }
+
+      function InvestmentInsights(){
+        const market = [
+          {label:'Bullish', value:80},
+          {label:'Neutral', value:60},
+          {label:'SIP', value:70}
+        ];
+        return (
+          <div className="grid cols-2">
+            <div className="card"><h3>Investment Insights</h3><p className="muted">Expert analysis to help you make informed decisions.</p></div>
+            <div className="card"><SimpleBarChart data={market} /></div>
+            <div className="card" style={{gridColumn:'1/-1'}}>
+              <h3>Asset Allocation (Example)</h3>
+              <div className="grid cols-3">
+                <div className="card">Large Cap<br/><strong>40%</strong></div>
+                <div className="card">Mid/Small<br/><strong>25%</strong></div>
+                <div className="card">Debt<br/><strong>25%</strong></div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      function MarketTrends(){
+        const idx = [{label:'2019',value:12},{label:'2020',value:15},{label:'2021',value:22},{label:'2022',value:4}];
+        return (
+          <div className="grid cols-2">
+            <div className="card"><h3>10-Year Market Indices</h3><SimpleBarChart data={idx} /></div>
+            <div className="card"><h3>Top Funds</h3><ul className="muted"><li>Axis Bluechip — 15.8%</li><li>Parag Parikh — 18.4%</li></ul></div>
+          </div>
+        )
+      }
+
+      function App(){
+        const {route, push} = useHashRoute();
+        const auth = useAuth();
+
+        function renderRoute(){
+          const r = route.split('?')[0];
+          if(r==='/'||r==='') return <Home />;
+          if(r==='/login') return <Login onLogin={auth.login} />;
+          if(r==='/funds') return <FundsList url="https://api.mfapi.in/mf" />;
+          if(r==='/trends') return <MarketTrends />;
+          if(r==='/insights') return auth.user ? <InvestmentInsights /> : <Login onLogin={auth.login} />;
+          if(r==='/admin') return auth.user && auth.user.role==='admin' ? <Admin /> : <div className="card">Access denied</div>;
+          if(r==='/investor') return auth.user && auth.user.role==='investor' ? <Investor /> : <div className="card">Access denied</div>;
+          if(r==='/advisor') return auth.user && auth.user.role==='advisor' ? <Advisor /> : <div className="card">Access denied</div>;
+          if(r==='/analyst') return auth.user && auth.user.role==='analyst' ? <Analyst /> : <div className="card">Access denied</div>;
+          return <div className="card">Not found</div>;
+        }
+
+        return (
+          <div className="container">
+            <header style={{marginBottom:12}}>
+              <div className="card" style={{padding:14,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div>
+                  <h1>Investment Insights Dashboard — Single File</h1>
+                  <div className="muted small">Demo — simplified from original project</div>
+                </div>
+              </div>
+            </header>
+
+            <Nav user={auth.user} onLogout={auth.logout} navigate={push} />
+
+            <main style={{marginTop:16}}>
+              {renderRoute()}
+            </main>
+          </div>
+        )
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>
